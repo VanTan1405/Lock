@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Locket AI - Chụp Ảnh Realtime, Chế Ảnh Hài & Ghép Nhạc TikTok</title>
+  <title>AI Scanner Lens - Tra Cứu Vật Thể, Niên Đại & Giá Bán Trực Tiếp</title>
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400;1,700&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400;1,700&family=Montserrat:wght@800;900&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
   
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -21,425 +21,253 @@
     <!-- Top Header -->
     <header class="app-header">
       <div class="logo-group">
-        <div class="locket-icon">
-          <i data-lucide="camera"></i>
+        <div class="lens-icon">
+          <i data-lucide="scan-line"></i>
         </div>
         <div>
-          <h1 class="logo-title">Locket <span class="badge-ai">AI Meme</span></h1>
-          <p class="logo-subtitle">Realtime Camera • Sound TikTok</p>
+          <h1 class="logo-title">AI Lens <span class="badge-ai">Scanner Pro</span></h1>
+          <p class="logo-subtitle">Tra cứu Niên đại • Lịch sử • Định giá</p>
         </div>
       </div>
       
       <div class="header-actions">
-        <!-- VIP Status Badge -->
-        <button id="vip-status-btn" class="vip-badge status-free" title="Bấm để xem thông tin VIP">
-          <i data-lucide="lock" class="vip-icon"></i>
-          <span id="vip-status-text">Khóa Upload Thư Viện</span>
+        <button id="history-toggle-btn" class="icon-button" title="Bộ sưu tập đã quét">
+          <i data-lucide="history"></i>
+          <span id="history-count-badge" class="count-badge">0</span>
         </button>
 
-        <button id="settings-toggle-btn" class="icon-button" title="Cài đặt AI Key">
-          <i data-lucide="settings"></i>
+        <button id="settings-toggle-btn" class="icon-button" title="Cấu hình Gemini API">
+          <i data-lucide="sparkles"></i>
         </button>
       </div>
     </header>
 
-    <!-- Navigation Bar -->
+    <!-- Main Navigation Bar -->
     <nav class="app-nav">
-      <button class="nav-btn active" data-tab="camera-tab">
+      <button class="nav-btn active" data-tab="scanner-tab">
         <i data-lucide="camera"></i>
-        <span>Máy Ảnh</span>
+        <span>Quét Camera</span>
       </button>
-      <button class="nav-btn" data-tab="feed-tab">
-        <i data-lucide="layout-grid"></i>
-        <span>Bảng Tin</span>
+      <button class="nav-btn" data-tab="collection-tab">
+        <i data-lucide="bookmark"></i>
+        <span>Bộ Sưu Tập</span>
       </button>
-      <button class="nav-btn" data-tab="widget-tab">
-        <i data-lucide="smartphone"></i>
-        <span>Widget iOS</span>
+      <button class="nav-btn" data-tab="guide-tab">
+        <i data-lucide="help-circle"></i>
+        <span>Hướng Dẫn</span>
       </button>
     </nav>
 
-    <!-- Main Content Area -->
+    <!-- Main Content Pages -->
     <main class="main-content">
       
-      <!-- TAB 1: CAMERA VIEW -->
-      <section id="camera-tab" class="tab-page active">
-        <div class="camera-card">
-          <!-- Locket Frame Outer -->
-          <div class="locket-viewfinder-wrapper">
-            <div id="viewfinder" class="locket-viewfinder">
+      <!-- TAB 1: SCANNER VIEW -->
+      <section id="scanner-tab" class="tab-page active">
+        <div class="scanner-card">
+          
+          <!-- Viewfinder Frame with Cyberpunk Scanner HUD -->
+          <div class="viewfinder-wrapper">
+            <div id="viewfinder" class="viewfinder-box">
               
-              <!-- Video Stream -->
+              <!-- Live Video Stream -->
               <video id="webcam" autoplay playsinline muted></video>
 
-              <!-- Live HUD Overlay -->
-              <div class="hud-overlay">
-                <div class="hud-top">
-                  <span class="live-dot"><i data-lucide="dot"></i> LIVE</span>
-                  <span id="hud-time" class="hud-badge">11:53 AM</span>
-                </div>
-                <div class="hud-bottom">
-                  <span id="hud-location" class="hud-location-badge">
-                    <i data-lucide="map-pin"></i> TP. Hồ Chí Minh
-                  </span>
+              <!-- Laser Scanning Line Overlay -->
+              <div id="scanning-line" class="scanning-line hidden"></div>
+
+              <!-- Reticle Bounding Target Overlay -->
+              <div class="reticle-box">
+                <div class="reticle-corner top-left"></div>
+                <div class="reticle-corner top-right"></div>
+                <div class="reticle-corner bottom-left"></div>
+                <div class="reticle-corner bottom-right"></div>
+                <div class="reticle-center-dot"></div>
+                <div class="reticle-status-badge" id="reticle-status">
+                  <i data-lucide="target"></i> Hướng camera vào vật thể
                 </div>
               </div>
 
-              <!-- Camera Filter Canvas (Offscreen processing) -->
+              <!-- Offscreen Canvas for Snapshot Capture -->
               <canvas id="photo-canvas" style="display: none;"></canvas>
 
-              <!-- Flash Effect Overlay -->
-              <div id="flash-effect" class="flash-overlay"></div>
-              
-              <!-- Camera Offline / Permission Prompt -->
+              <!-- Camera Offline Fallback Prompt -->
               <div id="camera-offline-msg" class="camera-offline hidden">
                 <i data-lucide="camera-off" class="offline-icon"></i>
-                <p>Chưa bật được Camera!</p>
-                <button id="retry-cam-btn" class="btn-secondary btn-sm">Bật lại Camera</button>
+                <p>Chưa kết nối được Camera!</p>
+                <button id="retry-cam-btn" class="btn-secondary btn-sm">Bật Camera</button>
               </div>
 
             </div>
           </div>
 
-          <!-- Camera Controls Bar -->
-          <div class="camera-controls">
+          <!-- Scanner Controls Bar -->
+          <div class="scanner-controls">
             
-            <!-- Gallery Upload Button (Locked by MoMo QR) -->
-            <button id="gallery-btn" class="control-circle gallery-circle" title="Tải từ thư viện (Khóa VIP MoMo)">
-              <i data-lucide="image"></i>
-              <span id="gallery-lock-icon" class="lock-indicator"><i data-lucide="lock"></i></span>
+            <!-- Gallery Image Upload Button -->
+            <button id="upload-image-btn" class="control-circle" title="Tải ảnh vật thể từ máy">
+              <i data-lucide="image-plus"></i>
             </button>
 
-            <!-- Shutter Capture Button -->
-            <button id="shutter-btn" class="shutter-button" title="Chụp ảnh ngay!">
-              <div class="shutter-inner"></div>
+            <!-- Main AI Scan Shutter Button -->
+            <button id="scan-trigger-btn" class="scan-button" title="Quét & Tra cứu ngay">
+              <div class="scan-button-inner">
+                <i data-lucide="sparkles"></i>
+                <span>QUÉT AI</span>
+              </div>
             </button>
 
-            <!-- Switch Camera (Front/Rear) -->
+            <!-- Switch Front/Rear Camera -->
             <button id="switch-cam-btn" class="control-circle" title="Đổi camera">
               <i data-lucide="refresh-cw"></i>
             </button>
           </div>
-          
-          <p class="camera-hint">
-            <i data-lucide="shield-alert"></i> Mặc định chụp ảnh trực tiếp thời gian thực. Cần mở khóa MoMo QR để chọn ảnh từ máy!
+
+          <p class="scanner-hint">
+            <i data-lucide="info"></i> Quét được đồ cổ, tiền kim loại, đồ điện tử, đồng hồ, sách, mô hình, vật dụng gia đình...
           </p>
 
         </div>
       </section>
 
-      <!-- TAB 2: LOCKET FEED -->
-      <section id="feed-tab" class="tab-page">
-        <div class="feed-header">
-          <h2><i data-lucide="sparkles"></i> Locket Memory & Meme Wall</h2>
-          <p>Xem lại các khoảnh khắc vừa chế & bài nhạc TikTok sôi động</p>
+      <!-- TAB 2: COLLECTION / HISTORY -->
+      <section id="collection-tab" class="tab-page">
+        <div class="section-header">
+          <h2><i data-lucide="bookmark"></i> Bộ Sưu Tập Vật Thể Đã Quét</h2>
+          <p>Lịch sử tra cứu thông tin vật thể, lịch sử & định giá</p>
         </div>
 
-        <div id="feed-list" class="feed-list">
-          <!-- Feed items will be generated dynamically -->
+        <div id="collection-grid" class="collection-grid">
+          <!-- Dynamically populated collection items -->
         </div>
       </section>
 
-      <!-- TAB 3: WIDGET SIMULATOR -->
-      <section id="widget-tab" class="tab-page">
-        <div class="widget-page-wrapper">
-          <div class="widget-info">
-            <h2><i data-lucide="smartphone"></i> Locket iOS/Android Widget</h2>
-            <p>Mô phỏng giao diện Locket hiển thị trực tiếp trên màn hình chính iPhone của bạn bè khi có bài đăng mới!</p>
+      <!-- TAB 3: USER GUIDE -->
+      <section id="guide-tab" class="tab-page">
+        <div class="section-header">
+          <h2><i data-lucide="compass"></i> Hướng Dẫn Sử Dụng AI Lens</h2>
+        </div>
+
+        <div class="guide-cards">
+          <div class="guide-card">
+            <div class="guide-icon"><i data-lucide="camera"></i></div>
+            <h3>1. Đưa Camera Vào Vật Thể</h3>
+            <p>Giữ camera cố định cách vật thể 20 - 50cm sao cho vật thể nằm trọn trong khung ngắm laser.</p>
           </div>
 
-          <!-- iPhone Frame Mockup -->
-          <div class="phone-mockup">
-            <div class="phone-notch"></div>
-            <div class="phone-screen">
-              <!-- Lockscreen Clock -->
-              <div class="phone-clock">
-                <span id="phone-time">11:53</span>
-                <span id="phone-date">Thứ Bảy, 15 Tháng 8</span>
-              </div>
+          <div class="guide-card">
+            <div class="guide-icon"><i data-lucide="cpu"></i></div>
+            <h3>2. Phân Tích AI Vision Tự Động</h3>
+            <p>Hệ thống AI sẽ tự động phân tích đường nét, màu sắc, hoa văn và niên đại sản phẩm.</p>
+          </div>
 
-              <!-- Locket Home Screen Widget -->
-              <div class="locket-widget-box" id="widget-box">
-                <div class="widget-inner">
-                  <img id="widget-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80" alt="Locket Widget">
-                  <div class="widget-meme-overlay">
-                    <span id="widget-caption" class="widget-badge">🔥 Đang chờ chụp ảnh mới...</span>
-                  </div>
-                  <div class="widget-audio-indicator" id="widget-audio-indicator">
-                    <i data-lucide="disc" class="spin-disc"></i>
-                    <span id="widget-song-title">Music: Vinahouse TikTok</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="phone-app-grid">
-                <div class="phone-app-icon"><i data-lucide="message-circle"></i></div>
-                <div class="phone-app-icon"><i data-lucide="music"></i></div>
-                <div class="phone-app-icon"><i data-lucide="instagram"></i></div>
-                <div class="phone-app-icon"><i data-lucide="video"></i></div>
-              </div>
-            </div>
+          <div class="guide-card">
+            <div class="guide-icon"><i data-lucide="dollar-sign"></i></div>
+            <h3>3. Xem Lịch Sử & Giá Bán</h3>
+            <p>Nhận ngay báo cáo chi tiết gồm: Niên đại lịch sử, định giá thị trường, độ hiếm và nghe giọng nói thuyết minh.</p>
           </div>
         </div>
       </section>
 
     </main>
 
-    <!-- MODAL 1: MOMO QR PAYMENT MODAL -->
-    <div id="momo-modal" class="modal-backdrop hidden">
-      <div class="modal-card momo-card">
+    <!-- MODAL 1: OBJECT ANALYSIS RESULT DISPLAY -->
+    <div id="result-modal" class="modal-backdrop hidden">
+      <div class="modal-card result-card">
         
-        <button id="close-momo-btn" class="modal-close-btn">
+        <button id="close-result-btn" class="modal-close-btn">
           <i data-lucide="x"></i>
         </button>
 
-        <div class="momo-header">
-          <div class="momo-brand">
-            <span class="momo-logo">MoMo</span>
-            <span class="vietqr-logo">VietQR</span>
-          </div>
-          <h3>Mở Khóa Upload Từ Thư Viện Máy</h3>
-          <p class="momo-subtitle">Quét mã QR MoMo 5.000đ để kích hoạt tính năng VIP mãi mãi!</p>
+        <div class="result-header">
+          <span class="category-badge" id="res-category">🏺 Đồ Cổ / Cổ Vật</span>
+          <h2 id="res-name">Bình Gốm Sứ Chu Đậu Thời Lê</h2>
+          <p class="res-subtitle" id="res-sub-header">Phân tích bởi AI Vision Engine</p>
         </div>
 
-        <div class="momo-body">
-          <!-- QR Code Container -->
-          <div class="qr-container">
-            <img src="assets/momo-qr.png" alt="Mã QR MoMo NGUYỄN VĂN TÂN 5.000đ" class="momo-qr-image">
-            <div class="qr-pulse-ring"></div>
+        <!-- Result Content Grid -->
+        <div class="result-body">
+          
+          <!-- Scanned Image Preview -->
+          <div class="result-image-box">
+            <img id="res-img" src="" alt="Vật thể đã quét">
+            <div class="rarity-badge" id="res-rarity">⭐ Độ hiếm: Hiếm (Collector Item)</div>
           </div>
 
-          <!-- Account Details -->
-          <div class="account-details">
-            <div class="detail-row">
-              <span class="label">Chủ tài khoản:</span>
-              <strong class="value">NGUYỄN VĂN TÂN</strong>
+          <!-- Highlight Stats Cards -->
+          <div class="stats-row">
+            <div class="stat-card price-card">
+              <span class="stat-label"><i data-lucide="tag"></i> Định Giá Thị Trường</span>
+              <strong class="stat-value" id="res-price">12.500.000đ - 18.000.000đ</strong>
             </div>
-            <div class="detail-row">
-              <span class="label">Số tài khoản:</span>
-              <span class="value font-mono">*******271</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Số tiền:</span>
-              <span class="value amount">5.000đ</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Nội dung CK:</span>
-              <span class="value copyable" id="transfer-code">LOCKETVIP</span>
+
+            <div class="stat-card era-card">
+              <span class="stat-label"><i data-lucide="calendar"></i> Niên Đại / Lịch Sử</span>
+              <strong class="stat-value" id="res-era">Thế kỷ XV (Thời Lê Sơ)</strong>
             </div>
           </div>
 
-          <!-- Verification Box -->
-          <div class="verification-box">
-            <label for="txn-id-input">Mã giao dịch MoMo (8-10 số):</label>
-            <div class="input-group">
-              <input type="text" id="txn-id-input" placeholder="Ví dụ: 394810294" maxlength="15">
-              <button id="verify-txn-btn" class="btn-primary btn-sm">Xác Nhận</button>
-            </div>
+          <!-- Detail Sections -->
+          <div class="detail-block">
+            <h3><i data-lucide="scroll"></i> Lịch Sử & Nguồn Gốc Xuất Xứ</h3>
+            <p id="res-history">
+              Dòng gốm sứ Chu Đậu nổi tiếng của Việt Nam phát triển rực rỡ vào thế kỷ 15 - 16. Hoa văn lam chàm đặc trưng vẽ cảnh thiên nhiên, hoa lá mang đậm bản sắc văn hóa Đại Việt.
+            </p>
           </div>
 
-          <!-- Quick Sandbox Simulation Button for Testing -->
-          <div class="sandbox-unlock-wrapper">
-            <button id="sandbox-unlock-btn" class="btn-success btn-full">
-              <i data-lucide="check-circle-2"></i> ⚡ Mô Phỏng Thanh Toán Thành Công (Demo Fast Unlock)
+          <div class="detail-block">
+            <h3><i data-lucide="layers"></i> Chất Liệu & Đặc Điểm Nhận Dạng</h3>
+            <p id="res-material">
+              Cốt gốm đụn men ngọc/lam chàm, xương gốm đất sét trắng mịn cao cấp. Đáy có dấu men rạn tự nhiên theo thời gian.
+            </p>
+          </div>
+
+          <div class="detail-block">
+            <h3><i data-lucide="shopping-bag"></i> Nơi Mua Bán & Gợi Ý Giao Dịch</h3>
+            <p id="res-market">
+              Thường giao dịch tại các Sàn Đấu Giá Cổ Vật, Chợ Đồ Cổ Hà Nội / TP.HCM, eBay, Chợ Tốt Antique Section.
+            </p>
+          </div>
+
+          <!-- Action Buttons Bar -->
+          <div class="result-actions">
+            <button id="tts-read-btn" class="btn-secondary flex-1">
+              <i data-lucide="volume-2"></i> <span>Đọc Thuyết Minh</span>
+            </button>
+
+            <button id="save-collection-btn" class="btn-primary flex-1">
+              <i data-lucide="bookmark-plus"></i> <span>Lưu Bộ Sưu Tập</span>
             </button>
           </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- MODAL 2: AI MEME EDITOR & TIKTOK AUDIO PAIRING -->
-    <div id="meme-modal" class="modal-backdrop hidden">
-      <div class="modal-card meme-editor-card">
-        
-        <button id="close-meme-btn" class="modal-close-btn">
-          <i data-lucide="x"></i>
-        </button>
-
-        <div class="editor-header">
-          <h2><i data-lucide="wand-2"></i> AI Chế Ảnh Hài & Ghép Nhạc TikTok</h2>
-          <p>Tự động phân tích ảnh & ghép bài nhạc trending phù hợp</p>
-        </div>
-
-        <div class="editor-grid">
-          
-          <!-- Left Column: Canvas Preview -->
-          <div class="preview-col">
-            <div class="canvas-wrapper">
-              <canvas id="meme-canvas"></canvas>
-              
-              <!-- Floating Sound Equalizer HUD -->
-              <div class="canvas-audio-hud">
-                <div class="spinning-disc" id="vinyl-disc">
-                  <i data-lucide="disc"></i>
-                </div>
-                <div class="song-info">
-                  <span id="active-song-title" class="song-title">Phát nhạc: Vinahouse TikTok Sôi Động</span>
-                  <div class="eq-bars">
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                    <span class="eq-bar"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column: Control Tools -->
-          <div class="tools-col">
-            
-            <!-- Tool Tabs -->
-            <div class="tool-tabs">
-              <button class="tool-tab-btn active" data-tool="memes">🎭 Mẫu Ảnh Hài</button>
-              <button class="tool-tab-btn" data-tool="music">🎵 Nhạc TikTok</button>
-              <button class="tool-tab-btn" data-tool="stickers">✨ Sticker & Chữ</button>
-            </div>
-
-            <!-- TAB 1: MEME PRESETS -->
-            <div id="tool-memes" class="tool-content active">
-              <div class="preset-grid">
-                <button class="preset-card active" data-preset="vtv">
-                  <span class="preset-badge">VTV24</span>
-                  <h4>Bản Tin VTV Drama</h4>
-                  <p>Tin nóng 24h đối tượng vừa bị chụp lén</p>
-                </button>
-
-                <button class="preset-card" data-preset="truyna">
-                  <span class="preset-badge">POLICE</span>
-                  <h4>Lệnh Truy Nã Hài</h4>
-                  <p>Tội danh: Quá đẹp trai xao xuyến xóm trọ</p>
-                </button>
-
-                <button class="preset-card" data-preset="thatnghiep">
-                  <span class="preset-badge">WORK</span>
-                  <h4>Hội Thất Nghiệp</h4>
-                  <p>Bằng thạc sĩ nhưng chờ việc quán trà đá</p>
-                </button>
-
-                <button class="preset-card" data-preset="flex">
-                  <span class="preset-badge">MONEY</span>
-                  <h4>Flexing Sang Chảnh</h4>
-                  <p>Dùng máy 30tr nhưng tài khoản còn 5k</p>
-                </button>
-
-                <button class="preset-card" data-preset="nguoicaotuoi">
-                  <span class="preset-badge">FLOWER</span>
-                  <h4>Hội Người Cao Tuổi</h4>
-                  <p>Chúc buổi sáng bình an cát tường</p>
-                </button>
-
-                <button class="preset-card" data-preset="thuglife">
-                  <span class="preset-badge">COOL</span>
-                  <h4>Thug Life 8-Bit</h4>
-                  <p>Kính râm, thuốc lá & nhạc Vinahouse</p>
-                </button>
-              </div>
-            </div>
-
-            <!-- TAB 2: TIKTOK MUSIC SELECTOR -->
-            <div id="tool-music" class="tool-content">
-              <div class="music-controls-box">
-                <div class="audio-player-card">
-                  <div class="track-meta">
-                    <i data-lucide="music-4" class="track-icon"></i>
-                    <div>
-                      <h4 id="player-track-name">Vinahouse Remix Sôi Động 2026</h4>
-                      <p id="player-track-genre">Thể loại: Trending TikTok Dance</p>
-                    </div>
-                  </div>
-
-                  <div class="player-buttons">
-                    <button id="play-pause-btn" class="btn-primary btn-round">
-                      <i data-lucide="play" id="play-icon"></i>
-                    </button>
-                    <button id="next-track-btn" class="btn-secondary btn-round" title="Đổi bài khác">
-                      <i data-lucide="skip-forward"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Sound Effects Pad -->
-                <div class="sfx-pad">
-                  <h4><i data-lucide="volume-2"></i> Sound Effects Hài Hước (Thả tiếng):</h4>
-                  <div class="sfx-buttons">
-                    <button class="sfx-btn" data-sfx="laugh"><i data-lucide="laugh"></i> Cười Té Ghế</button>
-                    <button class="sfx-btn" data-sfx="ohno"><i data-lucide="frown"></i> Oh No No</button>
-                    <button class="sfx-btn" data-sfx="conan"><i data-lucide="alert-triangle"></i> Conan Drama</button>
-                    <button class="sfx-btn" data-sfx="quack"><i data-lucide="bird"></i> Tiếng Vịt 🦆</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- TAB 3: STICKER & CUSTOM TEXT -->
-            <div id="tool-stickers" class="tool-content">
-              <div class="custom-text-box">
-                <label for="top-text-input">Câu nói phía trên (Top Meme):</label>
-                <input type="text" id="top-text-input" placeholder="Ví dụ: BẢN TIN THỜI SỰ 19H">
-
-                <label for="bottom-text-input">Câu nói phía dưới (Bottom Meme):</label>
-                <input type="text" id="bottom-text-input" placeholder="Ví dụ: Phát hiện đối tượng chụp lén">
-
-                <div class="sticker-selector">
-                  <label>Thêm Sticker Chế:</label>
-                  <div class="sticker-chips">
-                    <button class="sticker-chip" data-sticker="thug-glasses">🕶️ Kính Thug</button>
-                    <button class="sticker-chip" data-sticker="vtv">📺 Logo VTV</button>
-                    <button class="sticker-chip" data-sticker="crown">👑 Vương Miện</button>
-                    <button class="sticker-chip" data-sticker="fire">🔥 Cháy Phố</button>
-                    <button class="sticker-chip" data-sticker="crying-laugh">😂 Cười Khóc</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Modal Action Buttons -->
-            <div class="editor-actions">
-              <button id="post-locket-btn" class="btn-primary btn-full btn-lg">
-                <i data-lucide="send"></i> Đăng Lên Locket Feed & Widget
-              </button>
-              <div class="action-row">
-                <button id="download-meme-btn" class="btn-secondary flex-1">
-                  <i data-lucide="download"></i> Tải Về Máy
-                </button>
-                <button id="retake-photo-btn" class="btn-outline flex-1">
-                  <i data-lucide="camera-rotate"></i> Chụp Lại
-                </button>
-              </div>
-            </div>
-
-          </div>
 
         </div>
 
       </div>
     </div>
 
-    <!-- MODAL 3: AI SETTINGS MODAL -->
+    <!-- MODAL 2: GEMINI API SETTINGS -->
     <div id="settings-modal" class="modal-backdrop hidden">
       <div class="modal-card settings-card">
         <button id="close-settings-btn" class="modal-close-btn">
           <i data-lucide="x"></i>
         </button>
-        <h3><i data-lucide="bot"></i> Cấu Hình AI Vision & Gemini API</h3>
-        <p>Ứng dụng đã có sẵn AI Vision mô phỏng cực thông minh. Bạn có thể nhập Gemini API Key để kích hoạt AI thực tế!</p>
+        <h3><i data-lucide="sparkles"></i> Kết Nối Google Gemini Vision API</h3>
+        <p>Ứng dụng có sẵn AI Vision mô phỏng thông minh. Nhập **Gemini API Key** của bạn để kích hoạt khả năng nhận diện hình ảnh trực tiếp từ Google AI với độ chính xác 100%!</p>
         
-        <div class="input-group-vertical">
-          <label for="gemini-key-input">Gemini API Key (Tùy chọn):</label>
+        <div class="input-group-vertical mt-3">
+          <label for="gemini-key-input">Gemini API Key (Google AI Studio):</label>
           <input type="password" id="gemini-key-input" placeholder="AIzaSy...">
+        </div>
+
+        <div class="api-status-info mt-2">
+          <span id="api-status-text">Trạng thái: 🟢 Đang dùng AI Local Engine</span>
         </div>
 
         <button id="save-settings-btn" class="btn-primary btn-full mt-3">Lưu Cấu Hình</button>
       </div>
     </div>
 
-    <!-- Hidden File Input for Gallery Upload (When unlocked) -->
+    <!-- Hidden Image File Input -->
     <input type="file" id="hidden-file-input" accept="image/*" style="display: none;">
-
-    <!-- Hidden audio element -->
-    <audio id="bg-audio-player" loop crossorigin="anonymous"></audio>
 
   </div>
 

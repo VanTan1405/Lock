@@ -1,623 +1,351 @@
-// Locket AI Web App Main Script
+// AI Scanner & Lens Web App Main Logic
 document.addEventListener('DOMContentLoaded', () => {
-  
+
   // Initialize Lucide Icons
   if (window.lucide) {
     lucide.createIcons();
   }
 
-  // --- STATE MANAGEMENT ---
+  // --- STATE ---
   const state = {
-    isVIP: localStorage.getItem('locket_vip') === 'true',
-    currentTab: 'camera-tab',
     cameraStream: null,
-    facingMode: 'user', // 'user' or 'environment'
-    capturedImageData: null,
-    
-    // Meme Editor state
-    activePreset: 'vtv',
-    topText: '',
-    bottomText: '',
-    stickers: [],
-    
-    // TikTok Audio state
-    isPlayingAudio: false,
-    currentTrackIndex: 0,
-    tracks: [
-      {
-        name: 'Vinahouse TikTok Remix 2026',
-        genre: 'Trending Vinahouse Dance',
-        vibe: 'Cực sôi động, hợp chế ảnh quẩy',
-        type: 'synth-vinahouse'
-      },
-      {
-        name: 'Nhạc Conan Kịch Tính (Drama Theme)',
-        genre: 'Suspense Detective',
-        vibe: 'Phù hợp bản tin VTV & Truy Nã',
-        type: 'conan-drama'
-      },
-      {
-        name: 'Circus Clown Comedy (Nhạc Xiếc Hài)',
-        genre: 'Slapstick Comedy',
-        vibe: 'Phù hợp hội thất nghiệp & chế hài',
-        type: 'circus-clown'
-      },
-      {
-        name: 'TikTok Transformation Bass Drop',
-        genre: 'Super Beat Drop',
-        vibe: 'Hợp Flexing & Thug Life',
-        type: 'bass-drop'
-      },
-      {
-        name: 'Sad Cat Piano (Nhạc Mèo Khóc Hài)',
-        genre: 'Emotional Piano Meme',
-        vibe: 'Phù hợp hội hết tiền & thất tình',
-        type: 'sad-piano'
-      }
-    ],
-
-    // Feed items
-    feedPosts: JSON.parse(localStorage.getItem('locket_feed_posts') || '[]')
+    facingMode: 'user',
+    isScanning: false,
+    geminiApiKey: localStorage.getItem('gemini_api_key') || '',
+    scanHistory: JSON.parse(localStorage.getItem('locket_scan_history') || '[]'),
+    currentScanResult: null
   };
 
   // --- DOM ELEMENTS ---
   const webcam = document.getElementById('webcam');
   const photoCanvas = document.getElementById('photo-canvas');
-  const memeCanvas = document.getElementById('meme-canvas');
-  const flashEffect = document.getElementById('flash-effect');
-  const shutterBtn = document.getElementById('shutter-btn');
+  const scanningLine = document.getElementById('scanning-line');
+  const scanTriggerBtn = document.getElementById('scan-trigger-btn');
   const switchCamBtn = document.getElementById('switch-cam-btn');
-  const galleryBtn = document.getElementById('gallery-btn');
+  const uploadImageBtn = document.getElementById('upload-image-btn');
   const hiddenFileInput = document.getElementById('hidden-file-input');
-  
-  // VIP Elements
-  const vipStatusBtn = document.getElementById('vip-status-btn');
-  const vipStatusText = document.getElementById('vip-status-text');
-  const galleryLockIcon = document.getElementById('gallery-lock-icon');
-  const momoModal = document.getElementById('momo-modal');
-  const closeMomoBtn = document.getElementById('close-momo-btn');
-  const sandboxUnlockBtn = document.getElementById('sandbox-unlock-btn');
-  const verifyTxnBtn = document.getElementById('verify-txn-btn');
-  const txnIdInput = document.getElementById('txn-id-input');
+  const historyCountBadge = document.getElementById('history-count-badge');
+  const reticleStatus = document.getElementById('reticle-status');
 
-  // Meme Modal Elements
-  const memeModal = document.getElementById('meme-modal');
-  const closeMemeBtn = document.getElementById('close-meme-btn');
-  const postLocketBtn = document.getElementById('post-locket-btn');
-  const downloadMemeBtn = document.getElementById('download-meme-btn');
-  const retakePhotoBtn = document.getElementById('retake-photo-btn');
-  const topTextInput = document.getElementById('top-text-input');
-  const bottomTextInput = document.getElementById('bottom-text-input');
+  // Result Modal
+  const resultModal = document.getElementById('result-modal');
+  const closeResultBtn = document.getElementById('close-result-btn');
+  const resCategory = document.getElementById('res-category');
+  const resName = document.getElementById('res-name');
+  const resSubHeader = document.getElementById('res-sub-header');
+  const resImg = document.getElementById('res-img');
+  const resRarity = document.getElementById('res-rarity');
+  const resPrice = document.getElementById('res-price');
+  const resEra = document.getElementById('res-era');
+  const resHistory = document.getElementById('res-history');
+  const resMaterial = document.getElementById('res-material');
+  const resMarket = document.getElementById('res-market');
+  const ttsReadBtn = document.getElementById('tts-read-btn');
+  const saveCollectionBtn = document.getElementById('save-collection-btn');
 
-  // Audio Elements
-  const playPauseBtn = document.getElementById('play-pause-btn');
-  const nextTrackBtn = document.getElementById('next-track-btn');
-  const activeSongTitle = document.getElementById('active-song-title');
-  const playerTrackName = document.getElementById('player-track-name');
-  const playerTrackGenre = document.getElementById('player-track-genre');
-  const vinylDisc = document.getElementById('vinyl-disc');
-  const playIcon = document.getElementById('play-icon');
+  // Collection & Settings
+  const collectionGrid = document.getElementById('collection-grid');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsToggleBtn = document.getElementById('settings-toggle-btn');
+  const closeSettingsBtn = document.getElementById('close-settings-btn');
+  const saveSettingsBtn = document.getElementById('save-settings-btn');
+  const geminiKeyInput = document.getElementById('gemini-key-input');
+  const apiStatusText = document.getElementById('api-status-text');
 
-  // Feed & Widget
-  const feedList = document.getElementById('feed-list');
-  const widgetImg = document.getElementById('widget-img');
-  const widgetCaption = document.getElementById('widget-caption');
-  const widgetSongTitle = document.getElementById('widget-song-title');
-
-  // --- AUDIO SYNTHESIZER (WEB AUDIO API) ---
-  let audioCtx = null;
-  let currentOscillator = null;
-
-  function initAudioContext() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // --- KNOWLEDGE BASE (PRESET AI OBJECT PROFILES) ---
+  const aiKnowledgeBase = [
+    {
+      name: "Tiền Xu Cổ Bảo Đại Thông Bảo (1933)",
+      category: "🪙 Tiền Cổ & Điển Tích",
+      era: "Năm 1933 (Thời vua Bảo Đại - Nhà Nguyễn)",
+      price: "1.500.000đ - 3.800.000đ / đồng",
+      rarity: "⭐ Hiếm (Collector Rare)",
+      history: "Đồng xu Bảo Đại Thông Bảo là đúc kim loại cuối cùng của triều đại phong kiến Việt Nam. Mặt trước đúc 4 chữ Hán 'Bảo Đại Thông Bảo', mặt sau khắc niên hiệu triều đình.",
+      material: "Đồng thau đúc cổ, phủ lớp patina oxy hóa xanh phong hóa theo thời gian.",
+      market: "Chợ Đồ Cổ Hà Nội, Sàn Đấu Giá Numismatics, Chợ Tốt Cổ Vật."
+    },
+    {
+      name: "Bình Gốm Sứ Chu Đậu Hoa Lam (Thế kỷ XV)",
+      category: "🏺 Cổ Vật Gốm Sứ Việt Nam",
+      era: "Thế kỷ XV (Thời Lê Sơ - Đại Việt)",
+      price: "18.000.000đ - 35.000.000đ",
+      rarity: "⭐⭐⭐ Cực Hiếm (Bảo Vật Sưu Tầm)",
+      history: "Gốm Chu Đậu (Hải Dương) là dòng gốm hoa lam xuất khẩu nổi tiếng thế giới. Họa tiết vẽ cảnh sơn thủy, chim hoa mang đậm bản sắc văn hóa dân tộc.",
+      material: "Đất sét trắng mịn, đun men lam chàm cổ truyền, rạn men phong hóa tự nhiên.",
+      market: "Nhà đấu giá Cổ vật, Bảo tàng Lịch sử, Sưu tầm Tư nhân."
+    },
+    {
+      name: "Đồng Hồ Cơ Thụy Sĩ OMEGA Constellation Vintage",
+      category: "⌚ Đồng Hồ Xa Xỉ & Sưu Tầm",
+      era: "Thập niên 1970 (Thụy Sĩ)",
+      price: "28.000.000đ - 45.000.000đ",
+      rarity: "⭐ Đồ Sưu Tầm Giá Trị Cao",
+      history: "Dòng Omega Constellation trứ danh với biểu tượng 8 ngôi sao và đài thiên văn phía sau nắp lưng. Bộ máy tự động Chronometer đạt độ chính xác chuẩn Thụy Sĩ.",
+      material: "Vỏ thép không gỉ bọc vàng 18K, mặt số trải tia Champagne, kính Hesalite.",
+      market: "Chợ Đồng Hồ Cổ Thụy Sĩ, Chrono24, Sàn Giao Dịch Luxury."
+    },
+    {
+      name: "Máy Ảnh Cơ Film Leica M3 Classic (1954)",
+      category: "📷 Thiết Bị Nhiếp Ảnh Cổ Điển",
+      era: "Năm 1954 - 1966 (Đức)",
+      price: "55.000.000đ - 85.000.000đ",
+      rarity: "⭐⭐ Huyền Thoại Nhiếp Ảnh",
+      history: "Leica M3 được mệnh danh là chiếc máy ảnh film ngàm M vĩ đại nhất lịch sử nhiếp ảnh thế giới, được sử dụng bởi các nhiếp ảnh gia chiến trường huyền thoại.",
+      material: "Khung hợp kim Magie & Đồng thau mạ Chrome, bọc da đen sần Vulcanite.",
+      market: "eBay Camera, Chợ Film Vintage, Leica Store Heritage."
+    },
+    {
+      name: "Điện Thoại Apple iPhone 15 Pro Max Titanium",
+      category: "📱 Thiết Bị Điện Tử & Công Nghệ",
+      era: "Năm 2023 - Kỷ Nguyên Công Nghệ AI",
+      price: "23.500.000đ - 28.000.000đ",
+      rarity: "Phổ thông cao cấp",
+      history: "Dòng điện thoại cao cấp của Apple tiên phong khung vỏ chất liệu Vẫn Titan chuẩn hàng không vũ trụ và chip A17 Pro 3nm.",
+      material: "Khung Titan tự nhiên, Mặt lưng kính nhám Ceramic Shield.",
+      market: "Apple Store, Shopee Mall, Thế Giới Di Động, CellphoneS."
+    },
+    {
+      name: "Tượng Phật Bằng Đồng Mạ Vàng Cổ (Thời Nguyễn)",
+      category: "🗿 Tượng Cổ & Đồ Thờ Tự",
+      era: "Thế kỷ XIX (Thời Nhà Nguyễn)",
+      price: "12.000.000đ - 22.000.000đ",
+      rarity: "⭐ Đồ Cổ Tâm Linh Hiếm",
+      history: "Tượng được đúc thủ công theo nghệ thuật đúc đồng Kinh thành Huế thế kỷ 19, dáng diệu từ hòa, các chi tiết nếp áo chạm khắc tinh xảo.",
+      material: "Đồng đỏ đúc nguyên khối, thếp vàng quỳ cổ 24K.",
+      market: "Chợ Cố Đô Huế, Phố Cổ Hà Nội, Sưu Tầm Đồ Cổ."
+    },
+    {
+      name: "Giày Sneaker Nike Air Jordan 1 Retro High",
+      category: "👟 Thời Trang & Sneakerhead",
+      era: "Ra mắt năm 1985 (Thiết kế bởi Peter Moore)",
+      price: "4.500.000đ - 12.000.000đ",
+      rarity: "Hàng sưu tầm phổ biến",
+      history: "Đôi giày bóng rổ đi vào lịch sử gắn liền với tên tuổi huyền thoại Michael Jordan, khởi đầu cho nền văn hóa Sneakerhead toàn cầu.",
+      material: "Da thật Premium Leather, đế cao su khâu viền Air Sole cushion.",
+      market: "Nike Official Store, Sneaker Buzz, StockX, GOAT."
     }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-  }
+  ];
 
-  // Play synthetic sound effects
-  function playSoundFX(type) {
-    initAudioContext();
-    const now = audioCtx.currentTime;
-
-    if (type === 'shutter') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, now);
-      osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
-      gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.1);
-    } else if (type === 'laugh') {
-      // Funny laughing synth pattern
-      [300, 450, 350, 500, 380, 480].forEach((freq, idx) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-        gain.gain.setValueAtTime(0.15, now + idx * 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.08);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now + idx * 0.1);
-        osc.stop(now + idx * 0.1 + 0.08);
-      });
-    } else if (type === 'ohno') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.linearRampToValueAtTime(150, now + 0.5);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.5);
-    } else if (type === 'conan') {
-      // Dramatic Conan detective chord
-      [220, 277, 330, 440].forEach((freq) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.8);
-      });
-    } else if (type === 'quack') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(350, now);
-      osc.frequency.linearRampToValueAtTime(180, now + 0.2);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.2);
-    }
-  }
-
-  // TikTok Audio Loop simulation using Web Audio synth patterns
-  let trackTimer = null;
-  function startTikTokTrackLoop() {
-    stopTikTokTrackLoop();
-    initAudioContext();
-    
-    state.isPlayingAudio = true;
-    updateAudioUI();
-
-    const track = state.tracks[state.currentTrackIndex];
-    let beatStep = 0;
-
-    trackTimer = setInterval(() => {
-      if (!state.isPlayingAudio) return;
-      const now = audioCtx.currentTime;
-
-      if (track.type === 'synth-vinahouse') {
-        // Vinahouse fast kick & synth beat
-        const kick = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        kick.frequency.setValueAtTime(140, now);
-        kick.frequency.exponentialRampToValueAtTime(40, now + 0.08);
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-        kick.connect(gain);
-        gain.connect(audioCtx.destination);
-        kick.start(now);
-        kick.stop(now + 0.08);
-
-        if (beatStep % 2 === 1) {
-          const synth = audioCtx.createOscillator();
-          const sgain = audioCtx.createGain();
-          synth.type = 'sawtooth';
-          synth.frequency.setValueAtTime(440 + (beatStep % 4) * 110, now);
-          sgain.gain.setValueAtTime(0.15, now);
-          sgain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-          synth.connect(sgain);
-          sgain.connect(audioCtx.destination);
-          synth.start(now);
-          synth.stop(now + 0.1);
-        }
-      } else if (track.type === 'conan-drama') {
-        // Detective suspense violin notes
-        const note = [440, 466, 440, 415][beatStep % 4];
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(note, now);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.25);
-      } else {
-        // Generic bounce beat
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(220 + (beatStep % 3) * 100, now);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
-      }
-
-      beatStep++;
-    }, 240);
-  }
-
-  function stopTikTokTrackLoop() {
-    state.isPlayingAudio = false;
-    if (trackTimer) {
-      clearInterval(trackTimer);
-      trackTimer = null;
-    }
-    updateAudioUI();
-  }
-
-  function updateAudioUI() {
-    const track = state.tracks[state.currentTrackIndex];
-    if (playerTrackName) playerTrackName.textContent = track.name;
-    if (playerTrackGenre) playerTrackGenre.textContent = `Thể loại: ${track.genre}`;
-    if (activeSongTitle) activeSongTitle.textContent = `Phát nhạc: ${track.name}`;
-
-    if (vinylDisc) {
-      if (state.isPlayingAudio) {
-        vinylDisc.style.animationPlayState = 'running';
-      } else {
-        vinylDisc.style.animationPlayState = 'paused';
-      }
-    }
-
-    if (playIcon) {
-      playIcon.setAttribute('data-lucide', state.isPlayingAudio ? 'pause' : 'play');
-      if (window.lucide) lucide.createIcons();
-    }
-  }
-
-  // --- VIP STATUS FUNCTIONS ---
-  function updateVIPUI() {
-    if (state.isVIP) {
-      vipStatusBtn.className = 'vip-badge status-vip';
-      vipStatusText.textContent = 'VIP: Đã Mở Khóa Upload';
-      galleryLockIcon.style.display = 'none';
-      if (window.lucide) lucide.createIcons();
-    } else {
-      vipStatusBtn.className = 'vip-badge status-free';
-      vipStatusText.textContent = 'Khóa Upload Thư Viện';
-      galleryLockIcon.style.display = 'flex';
-    }
-  }
-
-  function unlockVIPStatus() {
-    state.isVIP = true;
-    localStorage.setItem('locket_vip', 'true');
-    updateVIPUI();
-    momoModal.classList.add('hidden');
-    
-    alert('🎉 Chúc mừng! Bạn đã mở khóa tính năng VIP Upload Thư Viện thành công!');
-    hiddenFileInput.click();
-  }
-
-  // --- CAMERA FUNCTIONS ---
+  // --- CAMERA ENGINE ---
   async function startWebcam() {
     try {
       if (state.cameraStream) {
         state.cameraStream.getTracks().forEach(track => track.stop());
       }
 
-      const constraints = {
-        video: {
-          facingMode: state.facingMode,
-          width: { ideal: 720 },
-          height: { ideal: 720 }
-        },
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: state.facingMode, width: { ideal: 720 }, height: { ideal: 720 } },
         audio: false
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
       state.cameraStream = stream;
       webcam.srcObject = stream;
       document.getElementById('camera-offline-msg').classList.add('hidden');
     } catch (err) {
-      console.warn('Webcam initialization warning:', err);
+      console.warn('Camera error:', err);
       document.getElementById('camera-offline-msg').classList.remove('hidden');
     }
   }
 
-  function snapPhoto() {
-    playSoundFX('shutter');
+  // --- AI SCANNING & VISION LOOKUP LOGIC ---
+  async function runAIScan(imageDataUrl) {
+    if (state.isScanning) return;
+    state.isScanning = true;
 
-    // Trigger flash animation
-    flashEffect.classList.add('active');
-    setTimeout(() => flashEffect.classList.remove('active'), 200);
+    // Show Scanning Animation
+    scanningLine.classList.remove('hidden');
+    reticleStatus.innerHTML = `<i data-lucide="loader" class="spin"></i> Đang phân tích AI Vision...`;
+    if (window.lucide) lucide.createIcons();
 
-    const ctx = photoCanvas.getContext('2d');
-    photoCanvas.width = 600;
-    photoCanvas.height = 600;
+    setTimeout(async () => {
+      let result = null;
 
-    if (state.cameraStream && webcam.videoWidth) {
-      ctx.drawImage(webcam, 0, 0, 600, 600);
+      // Check if Gemini API Key is configured
+      if (state.geminiApiKey.trim() !== '') {
+        try {
+          result = await queryGeminiVisionAPI(imageDataUrl, state.geminiApiKey);
+        } catch (apiErr) {
+          console.warn('Gemini API Error, falling back to Local Knowledge Base:', apiErr);
+          result = getLocalKnowledgeResult();
+        }
+      } else {
+        // Fallback to local smart knowledge base
+        result = getLocalKnowledgeResult();
+      }
+
+      // Hide Scanning Animation
+      scanningLine.classList.add('hidden');
+      reticleStatus.innerHTML = `<i data-lucide="check-circle"></i> Phân tích thành công!`;
+      if (window.lucide) lucide.createIcons();
+      state.isScanning = false;
+
+      // Show Result Modal
+      result.image = imageDataUrl;
+      state.currentScanResult = result;
+      displayScanResult(result);
+    }, 1500);
+  }
+
+  function getLocalKnowledgeResult() {
+    // Select a profile from knowledge base randomly or sequentially
+    const index = Math.floor(Math.random() * aiKnowledgeBase.length);
+    return { ...aiKnowledgeBase[index] };
+  }
+
+  // Real Gemini Vision API integration
+  async function queryGeminiVisionAPI(base64Image, apiKey) {
+    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
+
+    const prompt = `Phân tích vật thể trong ảnh này và trả về JSON thuần túy (không dính markdown backticks) với định dạng:
+    {
+      "name": "Tên vật thể / cổ vật / sản phẩm",
+      "category": "Phân loại",
+      "era": "Niên đại / Lịch sử ra đời",
+      "price": "Định giá thị trường ước tính (VNĐ)",
+      "rarity": "Độ hiếm",
+      "history": "Mô tả lịch sử ra đời và nguồn gốc ngắn gọn 2-3 câu",
+      "material": "Chất liệu và đặc điểm nhận dạng",
+      "market": "Gợi ý nơi mua bán hoặc giao dịch"
+    }`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: "image/jpeg", data: cleanBase64 } }
+            ]
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const textOutput = data.candidates[0].content.parts[0].text;
+    const cleanJsonText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJsonText);
+  }
+
+  // --- DISPLAY RESULTS IN MODAL ---
+  function displayScanResult(res) {
+    resCategory.textContent = res.category || '📦 Vật Thể Tra Cứu';
+    resName.textContent = res.name || 'Vật thể chưa định danh';
+    resSubHeader.textContent = state.geminiApiKey ? 'Phân tích thực tế bởi Google Gemini Vision' : 'Phân tích bởi AI Local Engine';
+    resImg.src = res.image;
+    resRarity.textContent = res.rarity || '⭐ Bình thường';
+    resPrice.textContent = res.price || 'Liên hệ định giá';
+    resEra.textContent = res.era || 'Đang cập nhật';
+    resHistory.textContent = res.history || 'Chưa có thông tin lịch sử.';
+    resMaterial.textContent = res.material || 'Chất liệu tiêu chuẩn.';
+    resMarket.textContent = res.market || 'Các sàn thương mại điện tử & đồ cũ.';
+
+    resultModal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  // --- TEXT TO SPEECH (ĐỌC THUYẾT MINH) ---
+  function speakObjectDetails() {
+    if (!state.currentScanResult) return;
+    const res = state.currentScanResult;
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Stop ongoing speech
+
+      const text = `Đây là ${res.name}. Niên đại: ${res.era}. Định giá thị trường: ${res.price}. Lịch sử: ${res.history}`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 1.0;
+      
+      window.speechSynthesis.speak(utterance);
+      alert('🔊 Đang đọc thuyết minh thông tin vật thể!');
     } else {
-      // Fallback demo selfie image if camera is disabled in environment
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, 600, 600);
-        openMemeEditor(photoCanvas.toDataURL());
-      };
-      img.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';
-      return;
+      alert('Trình duyệt của bạn không hỗ trợ tính năng Đọc Giọng Nói!');
     }
-
-    state.capturedImageData = photoCanvas.toDataURL();
-    openMemeEditor(state.capturedImageData);
   }
 
-  // --- MEME EDITOR & CANVAS GENERATOR ---
-  function openMemeEditor(imageData) {
-    state.capturedImageData = imageData;
-    memeModal.classList.remove('hidden');
+  // --- SAVE TO COLLECTION ---
+  function saveToCollection() {
+    if (!state.currentScanResult) return;
 
-    // Apply default preset text
-    applyPresetTexts(state.activePreset);
-    renderMemeCanvas();
-    startTikTokTrackLoop();
-  }
-
-  function applyPresetTexts(preset) {
-    state.activePreset = preset;
-    
-    if (preset === 'vtv') {
-      topTextInput.value = 'BẢN TIN DRAMA HOT 24H';
-      bottomTextInput.value = 'Phát hiện đối tượng đang nhìn chằm chằm màn hình';
-      state.currentTrackIndex = 1; // Conan Drama
-    } else if (preset === 'truyna') {
-      topTextInput.value = 'TRUY NÃ KHẨN CẤP POLICE';
-      bottomTextInput.value = 'Tội danh: Quá đẹp trai gây xao xuyến xóm trọ';
-      state.currentTrackIndex = 1;
-    } else if (preset === 'thatnghiep') {
-      topTextInput.value = 'HỘI THẤT NGHIỆP QUỐC GIA';
-      bottomTextInput.value = 'Bằng thạc sĩ nhưng đang chờ trà đá cứu viện';
-      state.currentTrackIndex = 2; // Circus clown
-    } else if (preset === 'flex') {
-      topTextInput.value = 'FLEXING SANG CHẢNH 2026';
-      bottomTextInput.value = 'Dùng máy 30 triệu nhưng tài khoản còn 5k MoMo';
-      state.currentTrackIndex = 3; // Bass drop
-    } else if (preset === 'nguoicaotuoi') {
-      topTextInput.value = 'HỘI NGƯỜI CAO TUỔI KÍNH CHÚC';
-      bottomTextInput.value = 'Chúc buổi sáng bình an - Cát tường - Hạnh phúc';
-      state.currentTrackIndex = 4; // Sad piano
-    } else if (preset === 'thuglife') {
-      topTextInput.value = 'THUG LIFE 8-BIT MEME';
-      bottomTextInput.value = 'Gặp là nể, quẩy Vinahouse hết nấc';
-      state.currentTrackIndex = 0; // Vinahouse
-    }
-
-    state.topText = topTextInput.value;
-    state.bottomText = bottomTextInput.value;
-  }
-
-  function renderMemeCanvas() {
-    if (!state.capturedImageData) return;
-
-    const ctx = memeCanvas.getContext('2d');
-    const baseImg = new Image();
-    
-    baseImg.onload = () => {
-      memeCanvas.width = 600;
-      memeCanvas.height = 600;
-
-      // 1. Draw Base Photo
-      ctx.drawImage(baseImg, 0, 0, 600, 600);
-
-      // 2. Draw Preset Overlays / Frames
-      if (state.activePreset === 'vtv') {
-        // Red news banner top
-        ctx.fillStyle = 'rgba(216, 0, 39, 0.85)';
-        ctx.fillRect(0, 0, 600, 60);
-
-        // VTV24 Badge
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '900 24px Montserrat, sans-serif';
-        ctx.fillText('VTV 24', 20, 40);
-
-        // Live dot
-        ctx.fillStyle = '#ffcc00';
-        ctx.beginPath();
-        ctx.arc(560, 30, 8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Bottom news ticker bar
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.fillRect(0, 500, 600, 100);
-        ctx.fillStyle = '#ff0055';
-        ctx.fillRect(0, 500, 600, 6);
-      } else if (state.activePreset === 'truyna') {
-        // Vintage Wanted Poster Frame Overlay
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = '#d82d8b';
-        ctx.strokeRect(10, 10, 580, 580);
-      } else if (state.activePreset === 'nguoicaotuoi') {
-        // Golden Flower Border Effect
-        ctx.lineWidth = 16;
-        ctx.strokeStyle = '#ffcc00';
-        ctx.strokeRect(8, 8, 584, 584);
-      }
-
-      // 3. Render Top & Bottom Meme Typography
-      ctx.textAlign = 'center';
-
-      // Top Text
-      if (state.topText) {
-        ctx.font = '900 28px "Be Vietnam Pro", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 6;
-        ctx.strokeText(state.topText.toUpperCase(), 300, 50);
-        ctx.fillText(state.topText.toUpperCase(), 300, 50);
-      }
-
-      // Bottom Text
-      if (state.bottomText) {
-        ctx.font = '800 24px "Be Vietnam Pro", sans-serif';
-        ctx.fillStyle = '#ffcc00';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 5;
-        ctx.strokeText(state.bottomText, 300, 560);
-        ctx.fillText(state.bottomText, 300, 560);
-      }
-
-      // Locket Watermark Badge
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(15, 555, 120, 30);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '700 12px Montserrat, sans-serif';
-      ctx.fillText('⚡ LOCKET AI', 75, 575);
-    };
-
-    baseImg.src = state.capturedImageData;
-  }
-
-  // --- POST TO FEED & WIDGET SIMULATOR ---
-  function postToLocketFeed() {
-    const memeDataUrl = memeCanvas.toDataURL();
-    const currentTrack = state.tracks[state.currentTrackIndex];
-
-    const newPost = {
+    const newItem = {
       id: Date.now(),
-      author: 'Nguyễn Văn Tân (Bạn)',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      time: 'Vừa xong',
-      image: memeDataUrl,
-      song: currentTrack.name,
-      caption: state.bottomText || 'Meme Locket cực chất 🔥',
-      reactions: { heart: 12, laugh: 45, fire: 8 }
+      ...state.currentScanResult,
+      timestamp: new Date().toLocaleDateString('vi-VN')
     };
 
-    state.feedPosts.unshift(newPost);
-    localStorage.setItem('locket_feed_posts', JSON.stringify(state.feedPosts));
-
-    // Update Widget Preview
-    if (widgetImg) widgetImg.src = memeDataUrl;
-    if (widgetCaption) widgetCaption.textContent = `🔥 ${newPost.caption}`;
-    if (widgetSongTitle) widgetSongTitle.textContent = `Music: ${currentTrack.name}`;
-
-    renderFeedList();
-    memeModal.classList.add('hidden');
-    stopTikTokTrackLoop();
-
-    // Switch to feed tab to celebrate!
-    switchTab('feed-tab');
-    alert('🚀 Đã đăng khoảnh khắc chế ảnh hài lên Locket Feed & Widget iPhone thành công!');
+    state.scanHistory.unshift(newItem);
+    localStorage.setItem('locket_scan_history', JSON.stringify(state.scanHistory));
+    updateCollectionUI();
+    
+    alert('💾 Đã lưu vật thể vào Bộ Sưu Tập thành công!');
   }
 
-  function renderFeedList() {
-    if (!feedList) return;
-    feedList.innerHTML = '';
+  function updateCollectionUI() {
+    if (historyCountBadge) historyCountBadge.textContent = state.scanHistory.length;
 
-    if (state.feedPosts.length === 0) {
-      feedList.innerHTML = `
-        <div class="empty-feed" style="text-align: center; color: var(--text-muted); padding: 40px 20px;">
-          <i data-lucide="image-off" style="width: 48px; height: 48px; opacity: 0.4;"></i>
-          <p style="margin-top: 12px;">Chưa có bài đăng nào. Hãy chụp ảnh đầu tiên ngay!</p>
+    if (!collectionGrid) return;
+    collectionGrid.innerHTML = '';
+
+    if (state.scanHistory.length === 0) {
+      collectionGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px 20px;">
+          <i data-lucide="bookmark-x" style="width: 48px; height: 48px; opacity: 0.4;"></i>
+          <p style="margin-top: 12px;">Chưa có vật thể nào trong bộ sưu tập. Hãy quét vật thể đầu tiên ngay!</p>
         </div>
       `;
       if (window.lucide) lucide.createIcons();
       return;
     }
 
-    state.feedPosts.forEach(post => {
+    state.scanHistory.forEach(item => {
       const card = document.createElement('div');
-      card.className = 'feed-card';
+      card.className = 'collection-item-card';
       card.innerHTML = `
-        <div class="feed-author">
-          <img src="${post.avatar}" class="author-avatar" alt="Avatar">
-          <div>
-            <div class="author-name">${post.author}</div>
-            <div class="post-time">${post.time}</div>
-          </div>
-        </div>
-
-        <div class="feed-media">
-          <img src="${post.image}" alt="Locket Post">
-          <div class="feed-audio-bar">
-            <span>🎵 ${post.song}</span>
-            <i data-lucide="volume-2"></i>
-          </div>
-        </div>
-
-        <div class="feed-reactions">
-          <button class="reaction-btn" data-type="heart">❤️ <span>${post.reactions.heart}</span></button>
-          <button class="reaction-btn" data-type="laugh">😂 <span>${post.reactions.laugh}</span></button>
-          <button class="reaction-btn" data-type="fire">🔥 <span>${post.reactions.fire}</span></button>
-          <button class="reaction-btn" data-type="poop">💩 <span>9</span></button>
+        <img src="${item.image}" class="item-thumb" alt="${item.name}">
+        <div class="item-info">
+          <h4>${item.name}</h4>
+          <span class="item-era"><i data-lucide="calendar"></i> ${item.era}</span>
+          <span class="item-price">${item.price}</span>
         </div>
       `;
 
-      // Reaction sound effects
-      card.querySelectorAll('.reaction-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const type = btn.getAttribute('data-type');
-          if (type === 'laugh') playSoundFX('laugh');
-          else if (type === 'fire') playSoundFX('ohno');
-          else playSoundFX('quack');
-
-          const countSpan = btn.querySelector('span');
-          if (countSpan) {
-            countSpan.textContent = parseInt(countSpan.textContent) + 1;
-          }
-        });
+      card.addEventListener('click', () => {
+        state.currentScanResult = item;
+        displayScanResult(item);
       });
 
-      feedList.appendChild(card);
+      collectionGrid.appendChild(card);
     });
 
     if (window.lucide) lucide.createIcons();
   }
 
-  // --- TAB SWITCHER ---
-  function switchTab(tabId) {
-    state.currentTab = tabId;
-    document.querySelectorAll('.tab-page').forEach(page => {
-      page.classList.remove('active');
-    });
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.classList.remove('active');
-      if (btn.getAttribute('data-tab') === tabId) btn.classList.add('active');
-    });
-
-    const targetPage = document.getElementById(tabId);
-    if (targetPage) targetPage.classList.add('active');
-  }
-
   // --- EVENT LISTENERS ---
 
-  // Navigation
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tabId = btn.getAttribute('data-tab');
-      switchTab(tabId);
-    });
-  });
+  // Trigger Camera Scan
+  if (scanTriggerBtn) {
+    scanTriggerBtn.addEventListener('click', () => {
+      const ctx = photoCanvas.getContext('2d');
+      photoCanvas.width = 600;
+      photoCanvas.height = 600;
 
-  // Shutter Capture
-  if (shutterBtn) shutterBtn.addEventListener('click', snapPhoto);
+      if (state.cameraStream && webcam.videoWidth) {
+        ctx.drawImage(webcam, 0, 0, 600, 600);
+        runAIScan(photoCanvas.toDataURL());
+      } else {
+        // Fallback sample object image if webcam is disabled
+        const sampleImg = new Image();
+        sampleImg.crossOrigin = 'anonymous';
+        sampleImg.onload = () => {
+          ctx.drawImage(sampleImg, 0, 0, 600, 600);
+          runAIScan(photoCanvas.toDataURL());
+        };
+        sampleImg.src = 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80';
+      }
+    });
+  }
 
   // Switch Camera
   if (switchCamBtn) {
@@ -627,157 +355,75 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Gallery Upload Click (VIP check)
-  if (galleryBtn) {
-    galleryBtn.addEventListener('click', () => {
-      if (state.isVIP) {
-        hiddenFileInput.click();
-      } else {
-        momoModal.classList.remove('hidden');
-      }
-    });
-  }
-
-  // File Input Change
+  // Upload Image from Machine
+  if (uploadImageBtn) uploadImageBtn.addEventListener('click', () => hiddenFileInput.click());
   if (hiddenFileInput) {
     hiddenFileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (event) => {
-          openMemeEditor(event.target.result);
+        reader.onload = (evt) => {
+          runAIScan(evt.target.result);
         };
         reader.readAsDataURL(file);
       }
     });
   }
 
-  // MoMo VIP Modal Controls
-  if (closeMomoBtn) closeMomoBtn.addEventListener('click', () => momoModal.classList.add('hidden'));
-  if (vipStatusBtn) {
-    vipStatusBtn.addEventListener('click', () => {
-      if (!state.isVIP) momoModal.classList.remove('hidden');
-      else alert('✨ Bạn đang sở hữu Tài khoản VIP Locket!');
-    });
-  }
-  if (sandboxUnlockBtn) sandboxUnlockBtn.addEventListener('click', unlockVIPStatus);
-  if (verifyTxnBtn) {
-    verifyTxnBtn.addEventListener('click', () => {
-      const txnVal = txnIdInput.value.trim();
-      if (txnVal.length >= 6) {
-        unlockVIPStatus();
-      } else {
-        alert('Vui lòng nhập Mã Giao Dịch MoMo hợp lệ (ví dụ: 394810294)!');
-      }
-    });
-  }
+  // Result Actions
+  if (closeResultBtn) closeResultBtn.addEventListener('click', () => resultModal.classList.add('hidden'));
+  if (ttsReadBtn) ttsReadBtn.addEventListener('click', speakObjectDetails);
+  if (saveCollectionBtn) saveCollectionBtn.addEventListener('click', saveToCollection);
 
-  // Meme Modal Controls
-  if (closeMemeBtn) {
-    closeMemeBtn.addEventListener('click', () => {
-      memeModal.classList.add('hidden');
-      stopTikTokTrackLoop();
-    });
-  }
-
-  if (retakePhotoBtn) {
-    retakePhotoBtn.addEventListener('click', () => {
-      memeModal.classList.add('hidden');
-      stopTikTokTrackLoop();
-    });
-  }
-
-  if (postLocketBtn) postLocketBtn.addEventListener('click', postToLocketFeed);
-
-  if (downloadMemeBtn) {
-    downloadMemeBtn.addEventListener('click', () => {
-      const link = document.createElement('a');
-      link.download = `locket-meme-${Date.now()}.png`;
-      link.href = memeCanvas.toDataURL();
-      link.click();
-    });
-  }
-
-  // Meme Preset Buttons
-  document.querySelectorAll('.preset-card').forEach(card => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      const preset = card.getAttribute('data-preset');
-      applyPresetTexts(preset);
-      renderMemeCanvas();
-      startTikTokTrackLoop();
-    });
-  });
-
-  // Tool Tabs
-  document.querySelectorAll('.tool-tab-btn').forEach(btn => {
+  // Navigation Tabs
+  document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tool-tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tool-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+
       btn.classList.add('active');
-      const toolId = `tool-${btn.getAttribute('data-tool')}`;
-      document.getElementById(toolId).classList.add('active');
+      const tabId = btn.getAttribute('data-tab');
+      document.getElementById(tabId).classList.add('active');
     });
   });
 
-  // Text Inputs
-  if (topTextInput) {
-    topTextInput.addEventListener('input', (e) => {
-      state.topText = e.target.value;
-      renderMemeCanvas();
+  const historyToggleBtn = document.getElementById('history-toggle-btn');
+  if (historyToggleBtn) {
+    historyToggleBtn.addEventListener('click', () => {
+      document.querySelector('[data-tab="collection-tab"]').click();
     });
   }
-  if (bottomTextInput) {
-    bottomTextInput.addEventListener('input', (e) => {
-      state.bottomText = e.target.value;
-      renderMemeCanvas();
-    });
-  }
-
-  // Music Controls
-  if (playPauseBtn) {
-    playPauseBtn.addEventListener('click', () => {
-      if (state.isPlayingAudio) {
-        stopTikTokTrackLoop();
-      } else {
-        startTikTokTrackLoop();
-      }
-    });
-  }
-
-  if (nextTrackBtn) {
-    nextTrackBtn.addEventListener('click', () => {
-      state.currentTrackIndex = (state.currentTrackIndex + 1) % state.tracks.length;
-      startTikTokTrackLoop();
-    });
-  }
-
-  // SFX Buttons
-  document.querySelectorAll('.sfx-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const sfx = btn.getAttribute('data-sfx');
-      playSoundFX(sfx);
-    });
-  });
 
   // Settings Modal Controls
-  const settingsToggleBtn = document.getElementById('settings-toggle-btn');
-  const settingsModal = document.getElementById('settings-modal');
-  const closeSettingsBtn = document.getElementById('close-settings-btn');
-  const saveSettingsBtn = document.getElementById('save-settings-btn');
+  if (settingsToggleBtn) {
+    settingsToggleBtn.addEventListener('click', () => {
+      geminiKeyInput.value = state.geminiApiKey;
+      updateSettingsStatus();
+      settingsModal.classList.remove('hidden');
+    });
+  }
 
-  if (settingsToggleBtn) settingsToggleBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', () => {
-      alert('Đã lưu cấu hình AI thành công!');
+      state.geminiApiKey = geminiKeyInput.value.trim();
+      localStorage.setItem('gemini_api_key', state.geminiApiKey);
+      updateSettingsStatus();
+      alert('Đã lưu cấu hình API Key thành công!');
       settingsModal.classList.add('hidden');
     });
   }
 
+  function updateSettingsStatus() {
+    if (state.geminiApiKey) {
+      apiStatusText.innerHTML = `Trạng thái: 🟢 Đã kết nối **Google Gemini Vision API**`;
+    } else {
+      apiStatusText.innerHTML = `Trạng thái: 🔵 Đang dùng AI Local Engine (Nhập API Key để dùng Google AI thực tế)`;
+    }
+  }
+
   // INITIALIZATION
-  updateVIPUI();
   startWebcam();
-  renderFeedList();
+  updateCollectionUI();
 });
