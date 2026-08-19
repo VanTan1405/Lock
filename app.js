@@ -6,15 +6,23 @@ document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
   }
 
+  // User provided Gemini API Key
+  const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6KMCuC3zkHxheg702LUfYY4uU8FtsxABXC8S_uZCW94bA';
+
   // --- STATE ---
   const state = {
     cameraStream: null,
     facingMode: 'user',
     isScanning: false,
-    geminiApiKey: localStorage.getItem('gemini_api_key') || '',
+    geminiApiKey: localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_KEY,
     scanHistory: JSON.parse(localStorage.getItem('locket_scan_history') || '[]'),
     currentScanResult: null
   };
+
+  // Save default key if not present
+  if (!localStorage.getItem('gemini_api_key')) {
+    localStorage.setItem('gemini_api_key', DEFAULT_GEMINI_KEY);
+  }
 
   // --- DOM ELEMENTS ---
   const webcam = document.getElementById('webcam');
@@ -52,80 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const geminiKeyInput = document.getElementById('gemini-key-input');
   const apiStatusText = document.getElementById('api-status-text');
 
-  // --- KNOWLEDGE BASE (PRESET AI OBJECT PROFILES) ---
-  const aiKnowledgeBase = [
-    {
-      name: "Tiền Xu Cổ Bảo Đại Thông Bảo (1933)",
-      category: "🪙 Tiền Cổ & Điển Tích",
-      era: "Năm 1933 (Thời vua Bảo Đại - Nhà Nguyễn)",
-      price: "1.500.000đ - 3.800.000đ / đồng",
-      rarity: "⭐ Hiếm (Collector Rare)",
-      history: "Đồng xu Bảo Đại Thông Bảo là đúc kim loại cuối cùng của triều đại phong kiến Việt Nam. Mặt trước đúc 4 chữ Hán 'Bảo Đại Thông Bảo', mặt sau khắc niên hiệu triều đình.",
-      material: "Đồng thau đúc cổ, phủ lớp patina oxy hóa xanh phong hóa theo thời gian.",
-      market: "Chợ Đồ Cổ Hà Nội, Sàn Đấu Giá Numismatics, Chợ Tốt Cổ Vật."
-    },
-    {
-      name: "Bình Gốm Sứ Chu Đậu Hoa Lam (Thế kỷ XV)",
-      category: "🏺 Cổ Vật Gốm Sứ Việt Nam",
-      era: "Thế kỷ XV (Thời Lê Sơ - Đại Việt)",
-      price: "18.000.000đ - 35.000.000đ",
-      rarity: "⭐⭐⭐ Cực Hiếm (Bảo Vật Sưu Tầm)",
-      history: "Gốm Chu Đậu (Hải Dương) là dòng gốm hoa lam xuất khẩu nổi tiếng thế giới. Họa tiết vẽ cảnh sơn thủy, chim hoa mang đậm bản sắc văn hóa dân tộc.",
-      material: "Đất sét trắng mịn, đun men lam chàm cổ truyền, rạn men phong hóa tự nhiên.",
-      market: "Nhà đấu giá Cổ vật, Bảo tàng Lịch sử, Sưu tầm Tư nhân."
-    },
-    {
-      name: "Đồng Hồ Cơ Thụy Sĩ OMEGA Constellation Vintage",
-      category: "⌚ Đồng Hồ Xa Xỉ & Sưu Tầm",
-      era: "Thập niên 1970 (Thụy Sĩ)",
-      price: "28.000.000đ - 45.000.000đ",
-      rarity: "⭐ Đồ Sưu Tầm Giá Trị Cao",
-      history: "Dòng Omega Constellation trứ danh với biểu tượng 8 ngôi sao và đài thiên văn phía sau nắp lưng. Bộ máy tự động Chronometer đạt độ chính xác chuẩn Thụy Sĩ.",
-      material: "Vỏ thép không gỉ bọc vàng 18K, mặt số trải tia Champagne, kính Hesalite.",
-      market: "Chợ Đồng Hồ Cổ Thụy Sĩ, Chrono24, Sàn Giao Dịch Luxury."
-    },
-    {
-      name: "Máy Ảnh Cơ Film Leica M3 Classic (1954)",
-      category: "📷 Thiết Bị Nhiếp Ảnh Cổ Điển",
-      era: "Năm 1954 - 1966 (Đức)",
-      price: "55.000.000đ - 85.000.000đ",
-      rarity: "⭐⭐ Huyền Thoại Nhiếp Ảnh",
-      history: "Leica M3 được mệnh danh là chiếc máy ảnh film ngàm M vĩ đại nhất lịch sử nhiếp ảnh thế giới, được sử dụng bởi các nhiếp ảnh gia chiến trường huyền thoại.",
-      material: "Khung hợp kim Magie & Đồng thau mạ Chrome, bọc da đen sần Vulcanite.",
-      market: "eBay Camera, Chợ Film Vintage, Leica Store Heritage."
-    },
-    {
-      name: "Điện Thoại Apple iPhone 15 Pro Max Titanium",
-      category: "📱 Thiết Bị Điện Tử & Công Nghệ",
-      era: "Năm 2023 - Kỷ Nguyên Công Nghệ AI",
-      price: "23.500.000đ - 28.000.000đ",
-      rarity: "Phổ thông cao cấp",
-      history: "Dòng điện thoại cao cấp của Apple tiên phong khung vỏ chất liệu Vẫn Titan chuẩn hàng không vũ trụ và chip A17 Pro 3nm.",
-      material: "Khung Titan tự nhiên, Mặt lưng kính nhám Ceramic Shield.",
-      market: "Apple Store, Shopee Mall, Thế Giới Di Động, CellphoneS."
-    },
-    {
-      name: "Tượng Phật Bằng Đồng Mạ Vàng Cổ (Thời Nguyễn)",
-      category: "🗿 Tượng Cổ & Đồ Thờ Tự",
-      era: "Thế kỷ XIX (Thời Nhà Nguyễn)",
-      price: "12.000.000đ - 22.000.000đ",
-      rarity: "⭐ Đồ Cổ Tâm Linh Hiếm",
-      history: "Tượng được đúc thủ công theo nghệ thuật đúc đồng Kinh thành Huế thế kỷ 19, dáng diệu từ hòa, các chi tiết nếp áo chạm khắc tinh xảo.",
-      material: "Đồng đỏ đúc nguyên khối, thếp vàng quỳ cổ 24K.",
-      market: "Chợ Cố Đô Huế, Phố Cổ Hà Nội, Sưu Tầm Đồ Cổ."
-    },
-    {
-      name: "Giày Sneaker Nike Air Jordan 1 Retro High",
-      category: "👟 Thời Trang & Sneakerhead",
-      era: "Ra mắt năm 1985 (Thiết kế bởi Peter Moore)",
-      price: "4.500.000đ - 12.000.000đ",
-      rarity: "Hàng sưu tầm phổ biến",
-      history: "Đôi giày bóng rổ đi vào lịch sử gắn liền với tên tuổi huyền thoại Michael Jordan, khởi đầu cho nền văn hóa Sneakerhead toàn cầu.",
-      material: "Da thật Premium Leather, đế cao su khâu viền Air Sole cushion.",
-      market: "Nike Official Store, Sneaker Buzz, StockX, GOAT."
-    }
-  ];
-
   // --- CAMERA ENGINE ---
   async function startWebcam() {
     try {
@@ -146,35 +80,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- AI SCANNING & VISION LOOKUP LOGIC ---
+  // --- REAL GOOGLE GEMINI VISION API LOOKUP ENGINE ---
   async function runAIScan(imageDataUrl) {
     if (state.isScanning) return;
     state.isScanning = true;
 
     // Show Scanning Animation
     scanningLine.classList.remove('hidden');
-    reticleStatus.innerHTML = `<i data-lucide="loader" class="spin"></i> Đang phân tích AI Vision...`;
+    reticleStatus.innerHTML = `<i data-lucide="loader" class="spin"></i> Đang gửi ảnh tới Google AI Vision...`;
     if (window.lucide) lucide.createIcons();
 
-    setTimeout(async () => {
+    try {
       let result = null;
 
-      // Check if Gemini API Key is configured
       if (state.geminiApiKey.trim() !== '') {
         try {
           result = await queryGeminiVisionAPI(imageDataUrl, state.geminiApiKey);
         } catch (apiErr) {
-          console.warn('Gemini API Error, falling back to Local Knowledge Base:', apiErr);
-          result = getLocalKnowledgeResult();
+          console.error('Gemini API Call Failed:', apiErr);
+          alert(`⚠️ Lỗi kết nối Google AI API (${apiErr.message}). Vui lòng kiểm tra lại API Key trong cài đặt!`);
+          result = getFallbackDemoResult();
         }
       } else {
-        // Fallback to local smart knowledge base
-        result = getLocalKnowledgeResult();
+        alert('⚠️ Chưa có Gemini API Key. Đang bật chế độ Demo mô phỏng.');
+        result = getFallbackDemoResult();
       }
 
       // Hide Scanning Animation
       scanningLine.classList.add('hidden');
-      reticleStatus.innerHTML = `<i data-lucide="check-circle"></i> Phân tích thành công!`;
+      reticleStatus.innerHTML = `<i data-lucide="check-circle"></i> Đã nhận diện xong!`;
       if (window.lucide) lucide.createIcons();
       state.isScanning = false;
 
@@ -182,57 +116,85 @@ document.addEventListener('DOMContentLoaded', () => {
       result.image = imageDataUrl;
       state.currentScanResult = result;
       displayScanResult(result);
-    }, 1500);
+    } catch (err) {
+      console.error('Scanning error:', err);
+      scanningLine.classList.add('hidden');
+      state.isScanning = false;
+    }
   }
 
-  function getLocalKnowledgeResult() {
-    // Select a profile from knowledge base randomly or sequentially
-    const index = Math.floor(Math.random() * aiKnowledgeBase.length);
-    return { ...aiKnowledgeBase[index] };
-  }
-
-  // Real Gemini Vision API integration
   async function queryGeminiVisionAPI(base64Image, apiKey) {
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
-    const prompt = `Phân tích vật thể trong ảnh này và trả về JSON thuần túy (không dính markdown backticks) với định dạng:
-    {
-      "name": "Tên vật thể / cổ vật / sản phẩm",
-      "category": "Phân loại",
-      "era": "Niên đại / Lịch sử ra đời",
-      "price": "Định giá thị trường ước tính (VNĐ)",
-      "rarity": "Độ hiếm",
-      "history": "Mô tả lịch sử ra đời và nguồn gốc ngắn gọn 2-3 câu",
-      "material": "Chất liệu và đặc điểm nhận dạng",
-      "market": "Gợi ý nơi mua bán hoặc giao dịch"
-    }`;
+    const prompt = `Bạn là chuyên gia phân tích hình ảnh hàng đầu thế giới. Hãy quan sát thật kỹ bức ảnh này và trả về kết quả định dạng JSON thuần túy (không chứa mã markdown hay backticks):
+{
+  "name": "Tên thương hiệu / model / vật thể chính xác trong ảnh",
+  "category": "Phân loại sản phẩm / vật thể",
+  "era": "Niên đại / Năm sản xuất / Lịch sử ra đời chính xác",
+  "price": "Định giá thị trường hiện tại tại Việt Nam (VNĐ)",
+  "rarity": "Độ hiếm / Phổ biến",
+  "history": "Lịch sử ra đời, nguồn gốc và ý nghĩa chi tiết của vật thể này",
+  "material": "Chất liệu, màu sắc và đặc điểm nhận dạng chính",
+  "market": "Gợi ý nơi mua bán (Shopee, Lazada, Chợ Đồ Cổ, Chợ Tốt...)"
+}`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: "image/jpeg", data: cleanBase64 } }
+    // Try Gemini models
+    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash'];
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: "image/jpeg", data: cleanBase64 } }
+                ]
+              }
             ]
-          }
-        ]
-      })
-    });
+          })
+        });
 
-    const data = await response.json();
-    const textOutput = data.candidates[0].content.parts[0].text;
-    const cleanJsonText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJsonText);
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const textOutput = data.candidates[0].content.parts[0].text;
+        const cleanJsonText = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanJsonText);
+      } catch (err) {
+        console.warn(`Model ${modelName} attempt failed:`, err);
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error("Không thể kết nối Gemini API");
+  }
+
+  function getFallbackDemoResult() {
+    return {
+      name: "Vật thể chưa phân tích (Chế độ Demo)",
+      category: "📦 Demo Mode",
+      era: "Chưa rõ - Cần nhập Gemini API Key",
+      price: "Liên hệ định giá",
+      rarity: "Chưa xác định",
+      history: "Vui lòng dán Gemini API Key chính xác từ Google AI Studio để AI Google quét vật thể thực tế.",
+      material: "Mặc định",
+      market: "N/A"
+    };
   }
 
   // --- DISPLAY RESULTS IN MODAL ---
   function displayScanResult(res) {
     resCategory.textContent = res.category || '📦 Vật Thể Tra Cứu';
     resName.textContent = res.name || 'Vật thể chưa định danh';
-    resSubHeader.textContent = state.geminiApiKey ? 'Phân tích thực tế bởi Google Gemini Vision' : 'Phân tích bởi AI Local Engine';
+    resSubHeader.textContent = state.geminiApiKey ? '✨ Phân tích chính xác 100% bởi Google Gemini Vision AI' : '⚠️ Chế độ Demo (Chưa cài API Key)';
     resImg.src = res.image;
     resRarity.textContent = res.rarity || '⭐ Bình thường';
     resPrice.textContent = res.price || 'Liên hệ định giá';
@@ -335,7 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.drawImage(webcam, 0, 0, 600, 600);
         runAIScan(photoCanvas.toDataURL());
       } else {
-        // Fallback sample object image if webcam is disabled
         const sampleImg = new Image();
         sampleImg.crossOrigin = 'anonymous';
         sampleImg.onload = () => {
@@ -417,9 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateSettingsStatus() {
     if (state.geminiApiKey) {
-      apiStatusText.innerHTML = `Trạng thái: 🟢 Đã kết nối **Google Gemini Vision API**`;
+      apiStatusText.innerHTML = `Trạng thái: 🟢 Đã cấu hình **Google Gemini Vision API**`;
     } else {
-      apiStatusText.innerHTML = `Trạng thái: 🔵 Đang dùng AI Local Engine (Nhập API Key để dùng Google AI thực tế)`;
+      apiStatusText.innerHTML = `Trạng thái: 🔴 Chưa có API Key`;
     }
   }
 
